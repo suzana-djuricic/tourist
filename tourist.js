@@ -42,11 +42,21 @@
 
     Base.prototype.skipButtonTemplate = '<button class="btn btn-default btn-sm pull-right tour-next">Skip this step →</button>';
 
-    Base.prototype.nextButtonTemplate = '<button class="btn btn-primary btn-sm pull-right tour-next">Next step →</button>';
+    Base.prototype.nextButtonTemplate = '<button class="btn-primary btn-sm btn-tourist pull-right tour-next"><span class="ion-arrow-right-b"></span></button>';
+    Base.prototype.nextButtonDisabledTemplate = '<button disabled="true" class="btn-primary btn-sm btn-tourist pull-right tour-next"><span class="ion-arrow-right-b"></span></button>';
 
-    Base.prototype.finalButtonTemplate = '<button class="btn btn-primary btn-sm pull-right tour-next">Finish up</button>';
+    Base.prototype.nextSkipButtonTemplate = '<button class="btn-primary btn-sm btn-tourist pull-right tour-nextSkip"><span class="ion-ios-fastforward"></span></button>';
+    Base.prototype.nextSkipButtonDisabledTemplate = '<button disabled="true" class="btn-primary btn-sm btn-tourist pull-right tour-nextSkip"><span class="ion-ios-fastforward"></span></button>';
 
-    Base.prototype.closeButtonTemplate = '<a class="btn btn-close tour-close" href="#"><i class="icon icon-remove"></i></a>';
+    Base.prototype.prevButtonTemplate = '<button class="btn-primary btn-sm btn-tourist pull-right tour-prev"><span class="ion-arrow-left-b"></span></button>';
+    Base.prototype.prevButtonDisabledTemplate = '<button disabled="true" class="btn-primary btn-sm btn-tourist pull-right tour-prev"><span class="ion-arrow-left-b"></span></button>';
+
+    Base.prototype.prevSkipButtonTemplate = '<button class="btn-primary btn-sm btn-tourist pull-right tour-prevSkip"><span class="ion-ios-rewind"></span></button>';
+    Base.prototype.prevSkipButtonDisabledTemplate = '<button disabled="true" class="btn-primary btn-sm btn-tourist pull-right tour-prevSkip"><span class="ion-ios-rewind"></span></button>';
+
+    Base.prototype.finalButtonTemplate = '<button class="btn-primary btn-sm btn-tourist btn-final pull-right tour-next"><span class="ion-checkmark-round"></span></button>';
+
+    Base.prototype.closeButtonTemplate = '<a class="btn-close tour-close" href="#"><i class="ion-close"></i></a>';
 
     Base.prototype.okButtonTemplate = '<button class="btn btn-sm tour-close btn-primary">Okay</button>';
 
@@ -56,11 +66,14 @@
 
     Base.prototype.highlightClass = 'tour-highlight';
 
-    Base.prototype.template = _.template('<div>\n  <div class="tour-container">\n    <%= close_button %>\n    <%= content %>\n    <p class="tour-counter <%= counter_class %>"><%= counter%></p>\n  </div>\n  <div class="tour-buttons">\n    <%= buttons %>\n  </div>\n</div>');
+    Base.prototype.template = _.template('<div>\n  <%= close_button %>\n  <div class="tour-container">\n    <%= content %>\n    </div>\n  <div class="tour-buttons">\n   <p class="tour-counter <%= counter_class %>"><%= counter%></p>\n  <%= buttons %>\n  </div>\n</div>');
 
     function Base(options) {
       this.options = options != null ? options : {};
       this.onClickNext = __bind(this.onClickNext, this);
+      this.onClickNextSkip = __bind(this.onClickNextSkip, this);
+      this.onClickPrev = __bind(this.onClickPrev, this);
+      this.onClickPrevSkip = __bind(this.onClickPrevSkip, this);
       this.onClickClose = __bind(this.onClickClose, this);
       this.el = $('<div/>');
       this.initialize(options);
@@ -92,7 +105,7 @@
 
     Base.prototype.hide = function() {};
 
-    Base.prototype.setTarget = function(targetElement, step) {
+    Base.prototype.setTarget = function(targetElement, step) {     
       return this._setTarget(targetElement, step);
     };
 
@@ -100,6 +113,8 @@
       if (this.target && this.target.removeClass) {
         this.target.removeClass(this.highlightClass);
       }
+      this.tip.clearBackdrop();
+      this.tip.clearIntervalOnResize();
       return this.target = null;
     };
 
@@ -118,6 +133,21 @@
       return false;
     };
 
+    Base.prototype.onClickNextSkip = function(event) {
+      this.trigger('click:nextSkip', this, event);
+      return false;
+    };
+
+    Base.prototype.onClickPrev = function(event) {
+      this.trigger('click:prev', this, event);
+      return false;
+    };
+
+    Base.prototype.onClickPrevSkip = function(event) {
+      this.trigger('click:prevSkip', this, event);
+      return false;
+    };
+
     /*
     Private
     */
@@ -131,14 +161,22 @@
       var el;
       el = this._getTipElement();
       el.delegate('.tour-close', 'click', this.onClickClose);
+      el.delegate('.tour-prev', 'click', this.onClickPrev);
+      el.delegate('.tour-prevSkip', 'click', this.onClickPrevSkip);
+      el.delegate('.tour-nextSkip', 'click', this.onClickNextSkip)
       return el.delegate('.tour-next', 'click', this.onClickNext);
     };
 
     Base.prototype._setTarget = function(target, step) {
       this.cleanupCurrentTarget();
+      if(target){
+        this.tip.onResize(target);
+        this.tip.backdrop(target);
+      }
       if (target && step && step.highlightTarget) {
         target.addClass(this.highlightClass);
       }
+
       return this.target = target;
     };
 
@@ -168,24 +206,31 @@
     Base.prototype._buildButtons = function(step) {
       var buttons;
       buttons = '';
-      if (step.okButton) {
-        buttons += this.okButtonTemplate;
-      }
-      if (step.skipButton) {
-        buttons += this.skipButtonTemplate;
-      }
-      if (step.nextButton) {
-        buttons += step.final ? this.finalButtonTemplate : this.nextButtonTemplate;
-      }
+      // if (step.okButton) {
+      //   buttons += this.okButtonTemplate;
+      // }
+      // if (step.skipButton) {
+      //   buttons += this.skipButtonTemplate;
+      // }
+
+      /**Instead of optionally adding next and prev buttons:
+         * next and prev buttons are always displayed
+         * if these buttons aren't set on true at step, they will be disabled
+      */
+
+      buttons += !step.nextButton || !step.nextButton.nextSkip ? this.nextSkipButtonDisabledTemplate : this.nextSkipButtonTemplate;
+      if(step.final){
+        buttons += this.finalButtonTemplate;
+      }else{ 
+        buttons += !step.nextButton || !step.nextButton.nextStep ? this.nextButtonDisabledTemplate : this.nextButtonTemplate;
+      }      
+      buttons += !step.prevButton || !step.prevButton.prevStep || step.index== 0 ?  this.prevButtonDisabledTemplate : this.prevButtonTemplate;
+      buttons += !step.prevButton || !step.prevButton.prevSkip ? this.prevSkipButtonDisabledTemplate : this.prevSkipButtonTemplate;
       return buttons;
     };
 
     Base.prototype._buildCloseButton = function(step) {
-      if (step.closeButton) {
         return this.closeButtonTemplate;
-      } else {
-        return '';
-      }
     };
 
     Base.prototype._renderActionLabels = function(el) {
@@ -352,7 +397,9 @@
 
 
   Tourist.Tip.BootstrapTip = (function() {
-    BootstrapTip.prototype.template = '<div class="popover tourist-popover">\n  <div class="arrow"></div>\n  <div class="popover-content"></div>\n</div>';
+    BootstrapTip.prototype.template = '<div class="popover tourist-popover">\n  <div class="arrow tourist-arrow"></div>\n  <div class="popover-content"></div>\n</div>';
+
+    BootstrapTip.prototype.intervalId = null;
 
     BootstrapTip.prototype.FLIP_POSITION = {
       bottom: 'top',
@@ -378,6 +425,106 @@
 
     BootstrapTip.prototype.show = function() {
       return this.el.show().addClass('visible');
+    };
+
+    BootstrapTip.prototype.clearBackdrop = function(){
+      $('.backdrop').height(0);
+      return this;
+    };
+
+    BootstrapTip.prototype.backdrop = function(element){
+      if(!$('.backdrop.top').get(0))
+        $("<div class='backdrop top'></div>").appendTo('body');
+      
+      if(!$('.backdrop.bottom').get(0))
+        $("<div class='backdrop bottom'></div>").appendTo('body');
+      
+      if(!$('.backdrop.left').get(0))
+        $("<div class='backdrop left'></div>").appendTo('body');
+      
+      if(!$('.backdrop.right').get(0))
+        $("<div class='backdrop right'></div>").appendTo('body');
+      
+      let scrollHeight = Math.max(
+        document.body.scrollHeight, document.documentElement.scrollHeight,
+        document.body.offsetHeight, document.documentElement.offsetHeight,
+        document.body.clientHeight, document.documentElement.clientHeight
+      );
+      
+      let scrollWidth = Math.max(
+        document.body.scrollWidth, document.documentElement.scrollWidth,
+        document.body.offsetWidth, document.documentElement.offsetWidth,
+        document.body.clientWidth, document.documentElement.clientWidth
+      );
+          
+      var e_top = element.offset().top;
+      var e_bottom =  e_top + element.innerHeight();
+      var e_left = element.offset().left;
+      var e_right = e_left + element.innerWidth();
+          
+      $('.backdrop.top').height(e_top);
+      $('.backdrop.top').width ( scrollWidth);
+      
+      $('.backdrop.bottom').height(scrollHeight - e_bottom);
+      $('.backdrop.bottom').width ( scrollWidth);
+      $('.backdrop.bottom').offset ( {top : e_bottom});
+      
+      $('.backdrop.left').height(element.innerHeight());
+      $('.backdrop.left').width (e_left);
+      $('.backdrop.left').offset ( {top : e_top});
+      
+      $('.backdrop.right').height(element.innerHeight());
+      $('.backdrop.right').width (scrollWidth - e_right);
+      $('.backdrop.right').offset ( {top : e_top, left : e_right});
+      
+      //console.log('TOP:' + e_top + ' | BOTTOM:'+ e_bottom + ' | LEFT:' + e_left + ' | RIGHT:' + e_right);
+      
+    };
+
+    BootstrapTip.prototype.clearIntervalOnResize = function(){
+      clearInterval(this.intervalId);
+    }
+
+    BootstrapTip.prototype.onResize = function (element){
+      let prevElementH = element.height();
+      let prevElementW = element.width();
+      let prevWindowH = $(window).height();
+      let prevWindowW = $(window).width();
+
+      var id;
+      var self = this;
+                
+      this.intervalId = setInterval(function(){
+          let doRedraw = false;		
+
+          let currElementH = element.height();
+          let currElementW = element.width();
+          let currWindowH = $(window).height();
+          let currWindowW = $(window).width();
+          
+          if(currElementH != prevElementH){
+            prevElementH = currElementH;
+            doRedraw = true;
+          }
+          if(currElementW != prevElementW){
+            prevElementW = currElementW;
+            doRedraw = true;
+          }
+          if(prevWindowH != currWindowH){
+            prevWindowH = currWindowH;
+            doRedraw = true;
+          }
+          if(prevWindowW != currWindowW){
+            prevWindowW = currWindowW;
+            doRedraw = true;
+          }
+
+          if(doRedraw){
+            self._setPosition(element, self.my, self.at);
+            self.show();
+            self.backdrop(element);
+          }
+      }, 20);
     };
 
     BootstrapTip.prototype.hide = function() {
@@ -428,6 +575,7 @@
       if (!target) {
         return;
       }
+
       _ref2 = my.split(' '), clas = _ref2[0], shift = _ref2[1];
       originalDisplay = this.el.css('display');
       this.el.css({
@@ -876,6 +1024,9 @@
       this.options = options != null ? options : {};
       this.onChangeCurrentStep = __bind(this.onChangeCurrentStep, this);
       this.next = __bind(this.next, this);
+      this.nextSkip = __bind(this.nextSkip, this);
+      this.prev = __bind(this.prev, this);
+      this.prevSkip = __bind(this.prevSkip, this);
       defs = {
         tipClass: 'Bootstrap'
       };
@@ -887,8 +1038,11 @@
         model: this.model
       }, this.options.tipOptions);
       this.view = new Tourist.Tip[this.options.tipClass](tipOptions);
-      this.view.bind('click:close', _.bind(this.stop, this, true));
+      this.view.bind('click:close', _.bind(this.stop, this, false));
       this.view.bind('click:next', this.next);
+      this.view.bind('click:nextSkip', this.nextSkip);
+      this.view.bind('click:prev', this.prev);
+      this.view.bind('click:prevSkip', this.prevSkip);
       this.model.bind('change:current_step', this.onChangeCurrentStep);
     }
 
@@ -921,6 +1075,50 @@
         return this._showStep(this.options.steps[index], index);
       } else if (index === this.options.steps.length) {
         return this._showSuccessFinalStep();
+      } else {
+        return this._stop();
+      }
+    };
+
+    Tour.prototype.nextSkip = function() {
+      var currentStep, index;
+      currentStep = this._teardownCurrentStep();
+      index = 0;
+      if (currentStep) {
+        index = currentStep.nextButton.nextSkip - 1;
+      }
+      if (index < this.options.steps.length) {
+        return this._showStep(this.options.steps[index], index);
+      } else if (index === this.options.steps.length) {
+        return this._showSuccessFinalStep();
+      } else {
+        return this._stop();
+      }
+    };
+
+    Tour.prototype.prev = function() {
+      var currentStep, index;
+      currentStep = this._teardownCurrentStep();
+      index = 0;
+      if (currentStep) {
+        index = currentStep.index - 1;
+      }
+      if (index >= 0) {
+        return this._showStep(this.options.steps[index], index);
+      } else {
+        return this._stop();
+      }
+    };
+
+    Tour.prototype.prevSkip = function() {
+      var currentStep, index;
+      currentStep = this._teardownCurrentStep();
+      index = 0;
+      if (currentStep) {
+        index = currentStep.prevButton.prevSkip - 1;
+      }
+      if (index >= 0) {
+        return this._showStep(this.options.steps[index], index);
       } else {
         return this._stop();
       }
